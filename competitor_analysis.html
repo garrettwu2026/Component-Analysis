@@ -3,35 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>競品分析系統 V3 - Google Search Grounding</title>
+    <title>競品規格與價格分析系統 V4</title>
     <style>
-        :root { --bg-color: #f4f7f6; --text-color: #333; --border-color: #ddd; --primary-color: #2c3e50; --action-color: #e74c3c; --card-bg: #fff; }
+        :root { --bg-color: #f4f7f6; --text-color: #333; --border-color: #bdc3c7; --primary-color: #2c3e50; --action-color: #e74c3c; --card-bg: #fff; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; }
         .control-panel { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .form-group { margin-bottom: 15px; }
-        label { font-weight: bold; display: block; margin-bottom: 5px; }
-        input[type="text"], input[type="password"], select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; color: var(--primary-color); }
+        input[type="text"], input[type="password"], select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-family: monospace; }
         .url-list { margin-bottom: 15px; }
         .url-item { display: flex; gap: 10px; margin-bottom: 10px; }
         .url-item input { flex-grow: 1; }
         button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
         .btn-add { background: #3498db; color: white; }
         .btn-remove { background: #95a5a6; color: white; }
-        .btn-fetch { background: var(--action-color); color: white; font-size: 1.2em; width: 100%; padding: 15px; margin-top: 10px; }
+        .btn-fetch { background: var(--action-color); color: white; font-size: 1.2em; width: 100%; padding: 15px; margin-top: 10px; letter-spacing: 2px; }
         .btn-fetch:hover { background: #c0392b; }
         
-        .dashboard { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; }
-        .brand-column { flex: 0 0 350px; background: var(--card-bg); border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-top: 5px solid; }
-        .brand-title { text-align: center; font-size: 1.2em; font-weight: bold; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid var(--border-color); }
-        .product-card { border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; margin-bottom: 15px; background: #fafafa; }
-        .product-name { font-weight: bold; font-size: 1.1em; color: var(--primary-color); margin-bottom: 10px; line-height: 1.4; }
-        .price-section { display: flex; justify-content: space-between; background: #e8f4f8; padding: 8px; border-radius: 4px; margin-bottom: 10px; }
-        .current-price { color: #d35400; font-weight: bold; font-size: 1.2em; }
-        .original-price { text-decoration: line-through; color: #7f8c8d; font-size: 0.9em; }
-        .discount { color: #27ae60; font-weight: bold; font-size: 0.9em; }
-        .specs-list { margin: 0; padding-left: 20px; font-size: 0.9em; color: #555; }
-        #loading { display: none; text-align: center; font-weight: bold; color: var(--primary-color); margin: 20px 0; }
+        /* Data Table Styles */
+        .table-container { overflow-x: auto; background: var(--card-bg); border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; min-width: 1000px; }
+        th, td { padding: 12px 15px; border: 1px solid var(--border-color); text-align: left; vertical-align: top; }
+        th { background-color: var(--primary-color); color: white; position: sticky; top: 0; z-index: 10; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+        tr:hover { background-color: #e8f4f8; }
+        .brand-col { font-weight: bold; color: #2980b9; }
+        .price-col { font-weight: bold; color: #d35400; font-family: monospace; font-size: 1.1em; }
+        .specs-list { margin: 0; padding-left: 20px; font-size: 0.9em; }
+        
+        #loading { display: none; text-align: center; font-weight: bold; color: var(--action-color); margin: 20px 0; padding: 10px; background: #fadbd8; border-radius: 4px; }
+        #error-log { color: #c0392b; font-family: monospace; white-space: pre-wrap; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -39,168 +41,197 @@
 <div class="container">
     <div class="control-panel">
         <div class="form-group">
-            <label for="apiKey">Google API Key:</label>
-            <input type="password" id="apiKey" placeholder="輸入您的 API 金鑰">
+            <label for="apiKey">Google API Key (自動儲存於本機):</label>
+            <input type="password" id="apiKey" placeholder="輸入您的 API 金鑰" onchange="saveState()">
         </div>
         <div class="form-group">
             <label for="aiModel">選擇 AI 模型:</label>
-            <select id="aiModel">
-                <option value="gemini-3.1-pro">Gemini 3.1 Pro (支援搜尋溯源)</option>
-                <option value="gemini-3.0-flash">Gemini 3.0 Flash (支援搜尋溯源)</option>
+            <select id="aiModel" onchange="saveState()">
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (穩定首選)</option>
                 <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                <option value="gemini-3.0-flash">Gemini 3.0 Flash (若發生錯誤代表端點未開放)</option>
+                <option value="gemini-3.0-pro">Gemini 3.0 Pro</option>
             </select>
         </div>
 
-        <label>競品網址列表 (URLs):</label>
+        <label>競品網址列表 (URLs - 自動儲存):</label>
         <div id="urlContainer" class="url-list">
-            <div class="url-item">
-                <input type="text" class="product-url" placeholder="輸入 Newegg 或其他電商產品網址">
-                <button class="btn-remove" onclick="removeUrl(this)">刪除</button>
             </div>
-        </div>
-        <button class="btn-add" onclick="addUrl()">+ 新增網址</button>
+        <button class="btn-add" onclick="addUrl('')">+ 新增網址</button>
 
-        <button class="btn-fetch" onclick="fetchAndAnalyze()">啟動 Gemini 聯網抓取與分析</button>
+        <button class="btn-fetch" onclick="fetchAndAnalyze()">執行抓取與生成表格</button>
+        <div id="error-log"></div>
     </div>
 
-    <div id="loading">系統處理中：正委託 Google 搜尋引擎檢索網頁並提取規格... </div>
-    <div class="dashboard" id="dashboard"></div>
+    <div id="loading">系統處理中：正委託 Google 網路檢索並解析資料... </div>
+    
+    <div class="table-container">
+        <table id="dataTable">
+            <thead>
+                <tr>
+                    <th width="10%">廠牌</th>
+                    <th width="25%">產品名稱</th>
+                    <th width="10%">原始價格</th>
+                    <th width="10%">當前價格</th>
+                    <th width="10%">折扣</th>
+                    <th width="35%">主要規格</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                </tbody>
+        </table>
+    </div>
 </div>
 
 <script>
-    const brandColors = ['#3498db', '#e67e22', '#9b59b6', '#1abc9c', '#f1c40f', '#34495e'];
+    // 系統初始化：載入本地儲存狀態
+    window.onload = function() {
+        const savedKey = localStorage.getItem('ca_apiKey');
+        const savedModel = localStorage.getItem('ca_model');
+        const savedUrls = JSON.parse(localStorage.getItem('ca_urls') || '[]');
 
-    function addUrl() {
+        if (savedKey) document.getElementById('apiKey').value = savedKey;
+        if (savedModel) document.getElementById('aiModel').value = savedModel;
+
+        if (savedUrls.length > 0) {
+            savedUrls.forEach(url => addUrl(url));
+        } else {
+            addUrl(''); // 預設給一個空欄位
+        }
+    };
+
+    // 儲存狀態至 localStorage
+    function saveState() {
+        localStorage.setItem('ca_apiKey', document.getElementById('apiKey').value);
+        localStorage.setItem('ca_model', document.getElementById('aiModel').value);
+        
+        const urlInputs = document.querySelectorAll('.product-url');
+        const urls = Array.from(urlInputs).map(input => input.value.trim()).filter(url => url !== '');
+        localStorage.setItem('ca_urls', JSON.stringify(urls));
+    }
+
+    function addUrl(value = '') {
         const container = document.getElementById('urlContainer');
         const div = document.createElement('div');
         div.className = 'url-item';
-        div.innerHTML = `<input type="text" class="product-url" placeholder="https://..."><button class="btn-remove" onclick="removeUrl(this)">刪除</button>`;
+        div.innerHTML = `
+            <input type="text" class="product-url" value="${value}" placeholder="https://..." onchange="saveState()">
+            <button class="btn-remove" onclick="removeUrl(this)">刪除</button>
+        `;
         container.appendChild(div);
+        saveState();
     }
 
-    function removeUrl(button) { button.parentElement.remove(); }
+    function removeUrl(button) { 
+        button.parentElement.remove(); 
+        saveState();
+    }
 
     async function fetchAndAnalyze() {
         const apiKey = document.getElementById('apiKey').value;
         const model = document.getElementById('aiModel').value;
         const urlInputs = document.querySelectorAll('.product-url');
-        const dashboard = document.getElementById('dashboard');
+        const tableBody = document.getElementById('tableBody');
         const loading = document.getElementById('loading');
+        const errorLog = document.getElementById('error-log');
         
-        if (!apiKey) { alert('請輸入 API Key。'); return; }
+        if (!apiKey) { alert('拒絕存取：請提供 API Key。'); return; }
 
         let urls = Array.from(urlInputs).map(input => input.value.trim()).filter(url => url !== '');
-        if (urls.length === 0) { alert('請至少輸入一個產品網址。'); return; }
+        if (urls.length === 0) { alert('參數遺失：請至少輸入一個有效網址。'); return; }
 
-        dashboard.innerHTML = '';
+        saveState(); // 執行前強制儲存
+        tableBody.innerHTML = '';
+        errorLog.innerText = '';
         loading.style.display = 'block';
+        
         let productsData = [];
 
-        // 直接將 URL 丟給 Gemini，免除前端抓取 HTML 的步驟
         for (const url of urls) {
             try {
-                console.log(`[聯網檢索中] 正在要求 Gemini 存取: ${url}`);
                 const aiResult = await callGeminiAPIWithSearch(apiKey, model, url);
                 if (aiResult) productsData.push(aiResult);
             } catch (error) {
-                console.error(`處理 ${url} 失敗:`, error);
+                const errMsg = `[解析中斷] ${url}\n原因: ${error.message}`;
+                console.error(errMsg);
+                errorLog.innerText += errMsg + '\n';
             }
         }
 
         loading.style.display = 'none';
-        renderDashboard(productsData);
+        renderTable(productsData);
     }
 
     async function callGeminiAPIWithSearch(apiKey, model, targetUrl) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         
         const prompt = `
-        任務：產品規格與價格萃取。
-        請使用你的 Google 搜尋能力 (Google Search Tool)，去尋找以下網址的最新產品資訊與價格。
-        目標網址：${targetUrl}
-        
-        請嚴格以 JSON 格式輸出以下資訊。如果找不到對應資訊，請填寫 null。不要輸出任何 Markdown 標籤或其他解釋性文字，純粹輸出 JSON 物件。
-        格式要求：
+        任務：產品規格萃取。使用 Google Search 檢索以下網址：${targetUrl}
+        嚴格輸出純 JSON 物件，找不到請填 null。
         {
-          "brand": "廠牌名稱 (大寫)",
-          "name": "產品完整名稱 (包含具體型號)",
-          "specs": ["主要規格1", "主要規格2"],
-          "originalPrice": 原始價格 (僅數字),
-          "currentPrice": 當前價格 (僅數字),
-          "discount": "折扣幅度"
+          "brand": "廠牌名稱",
+          "name": "完整產品型號",
+          "specs": ["規格1", "規格2", "規格3"],
+          "originalPrice": 原始價格數字,
+          "currentPrice": 當前價格數字,
+          "discount": "折扣文字"
         }
         `;
 
-        try {
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    // 關鍵設定：啟用 Google 搜尋作為工具
-                    tools: [{ googleSearch: {} }],
-                    generationConfig: { temperature: 0.1 }
-                })
-            });
-            
-            const data = await res.json();
-            const textResponse = data.candidates[0].content.parts[0].text;
-            
-            // 使用正規表達式強制擷取 JSON 區塊，避免模型輸出多餘的廢話
-            const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                return JSON.parse(jsonMatch[0]);
-            } else {
-                console.warn('無法從模型回應中提取 JSON:', textResponse);
-                return { name: "解析 JSON 失敗", currentPrice: 0 };
-            }
-        } catch (err) {
-            console.error('API 呼叫或解析失敗:', err);
-            return null;
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                tools: [{ googleSearch: {} }],
+                generationConfig: { temperature: 0.1 }
+            })
+        });
+        
+        // 錯誤攔截：捕捉 400/403 等 API 端點或權限異常
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(`HTTP ${response.status} - ${errData.error?.message || '未知伺服器錯誤'}`);
+        }
+
+        const data = await response.json();
+        const textResponse = data.candidates[0].content.parts[0].text;
+        
+        const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+        } else {
+            throw new Error("模型未回傳標準 JSON 格式");
         }
     }
 
-    function renderDashboard(products) {
-        const dashboard = document.getElementById('dashboard');
-        const groupedData = products.reduce((acc, curr) => {
-            const brand = (curr.brand || '未分類').toUpperCase();
-            if (!acc[brand]) acc[brand] = [];
-            acc[brand].push(curr);
-            return acc;
-        }, {});
-
-        Object.keys(groupedData).forEach(brand => {
-            groupedData[brand].sort((a, b) => (b.currentPrice || 0) - (a.currentPrice || 0));
+    function renderTable(products) {
+        const tableBody = document.getElementById('tableBody');
+        
+        // 依照廠牌排序，確保相同廠牌排在一起 (Excel 的 Sort 邏輯)
+        products.sort((a, b) => {
+            const brandA = (a.brand || 'ZZZ').toUpperCase();
+            const brandB = (b.brand || 'ZZZ').toUpperCase();
+            if (brandA < brandB) return -1;
+            if (brandA > brandB) return 1;
+            // 廠牌相同時，依價格高低排序
+            return (b.currentPrice || 0) - (a.currentPrice || 0);
         });
 
-        let colorIndex = 0;
-        for (const [brand, items] of Object.entries(groupedData)) {
-            const color = brandColors[colorIndex % brandColors.length];
-            colorIndex++;
-
-            const colDiv = document.createElement('div');
-            colDiv.className = 'brand-column';
-            colDiv.style.borderTopColor = color;
-            colDiv.innerHTML = `<div class="brand-title" style="color: ${color}">${brand}</div>`;
-
-            items.forEach(product => {
-                const specsHtml = (product.specs || []).map(s => `<li>${s}</li>`).join('');
-                colDiv.innerHTML += `
-                    <div class="product-card">
-                        <div class="product-name">${product.name || '未知產品'}</div>
-                        <div class="price-section">
-                            <div>
-                                <span class="current-price">$${product.currentPrice || 'N/A'}</span><br>
-                                <span class="original-price">$${product.originalPrice || 'N/A'}</span>
-                            </div>
-                            <div class="discount">${product.discount || ''}</div>
-                        </div>
-                        <ul class="specs-list">${specsHtml}</ul>
-                    </div>
-                `;
-            });
-            dashboard.appendChild(colDiv);
-        }
+        products.forEach(product => {
+            const tr = document.createElement('tr');
+            const specsHtml = (product.specs || []).map(s => `<li>${s}</li>`).join('');
+            
+            tr.innerHTML = `
+                <td class="brand-col">${product.brand || 'N/A'}</td>
+                <td>${product.name || '未知產品'}</td>
+                <td>${product.originalPrice ? '$' + product.originalPrice : '-'}</td>
+                <td class="price-col">${product.currentPrice ? '$' + product.currentPrice : '-'}</td>
+                <td style="color: #27ae60; font-weight: bold;">${product.discount || '-'}</td>
+                <td><ul class="specs-list">${specsHtml}</ul></td>
+            `;
+            tableBody.appendChild(tr);
+        });
     }
 </script>
 
