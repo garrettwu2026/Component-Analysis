@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>競品規格與價格分析系統 V2</title>
+    <title>競品分析系統 V3 - Google Search Grounding</title>
     <style>
         :root { --bg-color: #f4f7f6; --text-color: #333; --border-color: #ddd; --primary-color: #2c3e50; --action-color: #e74c3c; --card-bg: #fff; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
@@ -45,26 +45,25 @@
         <div class="form-group">
             <label for="aiModel">選擇 AI 模型:</label>
             <select id="aiModel">
-                <option value="gemini-3.1-pro">Gemini 3.1 Pro (最新旗艦，推理能力最強)</option>
-                <option value="gemini-3.0-flash">Gemini 3.0 Flash (最新輕量，速度與成本平衡)</option>
+                <option value="gemini-3.1-pro">Gemini 3.1 Pro (支援搜尋溯源)</option>
+                <option value="gemini-3.0-flash">Gemini 3.0 Flash (支援搜尋溯源)</option>
                 <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
             </select>
         </div>
 
         <label>競品網址列表 (URLs):</label>
         <div id="urlContainer" class="url-list">
             <div class="url-item">
-                <input type="text" class="product-url" placeholder="https://example.com/product">
+                <input type="text" class="product-url" placeholder="輸入 Newegg 或其他電商產品網址">
                 <button class="btn-remove" onclick="removeUrl(this)">刪除</button>
             </div>
         </div>
         <button class="btn-add" onclick="addUrl()">+ 新增網址</button>
 
-        <button class="btn-fetch" onclick="fetchAndAnalyze()">抓取產品價格與規格</button>
+        <button class="btn-fetch" onclick="fetchAndAnalyze()">啟動 Gemini 聯網抓取與分析</button>
     </div>
 
-    <div id="loading">系統處理中：正在解析網頁與呼叫 AI 模型... </div>
+    <div id="loading">系統處理中：正委託 Google 搜尋引擎檢索網頁並提取規格... </div>
     <div class="dashboard" id="dashboard"></div>
 </div>
 
@@ -97,30 +96,14 @@
         loading.style.display = 'block';
         let productsData = [];
 
+        // 直接將 URL 丟給 Gemini，免除前端抓取 HTML 的步驟
         for (const url of urls) {
             try {
-                const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
-                const response = await fetch(proxyUrl);
-                const htmlText = await response.text();
-                
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(htmlText, 'text/html');
-                
-                // 強化特徵提取：優先抓取 title 與 meta description
-                const pageTitle = doc.title || '無標題';
-                const metaDesc = doc.querySelector('meta[name="description"]')?.content || '無描述';
-                const rawText = doc.body.innerText.replace(/\s+/g, ' ').substring(0, 12000);
-                
-                const combinedText = `網頁標題: ${pageTitle}\n網頁描述: ${metaDesc}\n網頁內文: ${rawText}`;
-                
-                // 供開發者除錯用：按 F12 檢查 Console，確認是否被防爬蟲機制阻擋
-                console.log(`[抓取結果] ${url} \n標題: ${pageTitle}\n前200字: ${rawText.substring(0, 200)}`);
-
-                const aiResult = await callGeminiAPI(apiKey, model, combinedText);
+                console.log(`[聯網檢索中] 正在要求 Gemini 存取: ${url}`);
+                const aiResult = await callGeminiAPIWithSearch(apiKey, model, url);
                 if (aiResult) productsData.push(aiResult);
-
             } catch (error) {
-                console.error(`讀取 ${url} 失敗:`, error);
+                console.error(`處理 ${url} 失敗:`, error);
             }
         }
 
@@ -128,30 +111,24 @@
         renderDashboard(productsData);
     }
 
-    async function callGeminiAPI(apiKey, model, text) {
+    async function callGeminiAPIWithSearch(apiKey, model, targetUrl) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         
         const prompt = `
-        你是一個嚴謹的產品規格分析系統。請閱讀以下網頁資訊（包含標題、描述與內文），並嚴格以 JSON 格式輸出。
-        若內文顯示類似 "Just a moment", "Cloudflare" 或 "請驗證" 等字眼，代表網頁被阻擋，請在 name 填入 "網頁抓取被阻擋"。
+        任務：產品規格與價格萃取。
+        請使用你的 Google 搜尋能力 (Google Search Tool)，去尋找以下網址的最新產品資訊與價格。
+        目標網址：${targetUrl}
         
-        提取邏輯：
-        1. 優先從「網頁標題」或「網頁描述」提取「產品完整名稱」與「廠牌」。
-        2. 價格與規格請從「網頁內文」中尋找。
-        3. 找不到資訊請填寫 null。嚴禁輸出 Markdown 標籤 (如 \`\`\`json)，純輸出 JSON 字串。
-        
+        請嚴格以 JSON 格式輸出以下資訊。如果找不到對應資訊，請填寫 null。不要輸出任何 Markdown 標籤或其他解釋性文字，純粹輸出 JSON 物件。
         格式要求：
         {
           "brand": "廠牌名稱 (大寫)",
-          "name": "產品完整名稱 (必須盡可能詳細，包含型號)",
+          "name": "產品完整名稱 (包含具體型號)",
           "specs": ["主要規格1", "主要規格2"],
-          "originalPrice": 原始價格 (純數字),
-          "currentPrice": 當前價格 (純數字),
+          "originalPrice": 原始價格 (僅數字),
+          "currentPrice": 當前價格 (僅數字),
           "discount": "折扣幅度"
         }
-        
-        輸入資訊：
-        ${text}
         `;
 
         try {
@@ -160,14 +137,23 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: prompt }] }],
+                    // 關鍵設定：啟用 Google 搜尋作為工具
+                    tools: [{ googleSearch: {} }],
                     generationConfig: { temperature: 0.1 }
                 })
             });
             
             const data = await res.json();
             const textResponse = data.candidates[0].content.parts[0].text;
-            const cleanJsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-            return JSON.parse(cleanJsonString);
+            
+            // 使用正規表達式強制擷取 JSON 區塊，避免模型輸出多餘的廢話
+            const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                return JSON.parse(jsonMatch[0]);
+            } else {
+                console.warn('無法從模型回應中提取 JSON:', textResponse);
+                return { name: "解析 JSON 失敗", currentPrice: 0 };
+            }
         } catch (err) {
             console.error('API 呼叫或解析失敗:', err);
             return null;
