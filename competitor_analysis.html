@@ -3,90 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>競品規格與價格分析系統 V5</title>
+    <title>競品定價分析矩陣 V6</title>
     <style>
-        :root { --bg-color: #f4f7f6; --text-color: #333; --border-color: #bdc3c7; --primary-color: #2c3e50; --action-color: #e74c3c; --card-bg: #fff; --row-header-bg: #34495e; }
+        :root { --bg-color: #f0f3f4; --text-color: #2c3e50; --border-color: #d5d8dc; --primary-color: #34495e; --action-color: #e74c3c; --card-bg: #ffffff; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
         
-        /* Layout */
-        .app-wrapper {
-            display: flex;
-            gap: 20px;
-            max-width: 1800px;
-            margin: 0 auto;
-            align-items: flex-start;
-        }
+        .app-wrapper { display: flex; gap: 20px; max-width: 1800px; margin: 0 auto; align-items: flex-start; }
         
-        /* Left: Table Section */
-        .table-section {
-            flex: 3;
-            background: var(--card-bg);
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            overflow-x: auto;
-            min-height: 600px;
-        }
+        /* Left: Matrix Section */
+        .table-section { flex: 3; background: var(--card-bg); border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow-x: auto; min-height: 600px; padding: 1px; }
         
         /* Right: Control Panel */
-        .control-panel {
-            flex: 1;
-            min-width: 320px;
-            max-width: 400px;
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 20px; /* 固定在右側 */
-        }
+        .control-panel { flex: 1; min-width: 320px; max-width: 400px; background: var(--card-bg); padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: sticky; top: 20px; }
 
-        /* Form Elements */
         .form-group { margin-bottom: 15px; }
-        label { font-weight: bold; display: block; margin-bottom: 5px; color: var(--primary-color); font-size: 0.9em; }
-        input[type="text"], input[type="password"], select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-family: monospace; }
-        .url-list { margin-bottom: 15px; max-height: 300px; overflow-y: auto; padding-right: 5px;}
-        .url-item { display: flex; gap: 10px; margin-bottom: 10px; }
+        label { font-weight: 600; display: block; margin-bottom: 8px; color: var(--primary-color); font-size: 0.9em; letter-spacing: 0.5px; }
+        input[type="text"], input[type="password"], select { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; font-family: monospace; font-size: 14px; background-color: #fdfefe; }
+        input:focus, select:focus { outline: none; border-color: #3498db; }
+        
+        .url-list { margin-bottom: 15px; max-height: 350px; overflow-y: auto; padding-right: 5px; }
+        .url-item { display: flex; gap: 8px; margin-bottom: 10px; }
         .url-item input { flex-grow: 1; }
-        button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-        .btn-add { background: #3498db; color: white; width: 100%; margin-bottom: 15px;}
+        
+        button { padding: 12px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s ease; }
+        .btn-add { background: #3498db; color: white; width: 100%; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(52, 152, 219, 0.3); }
+        .btn-add:hover { background: #2980b9; transform: translateY(-1px); }
         .btn-remove { background: #95a5a6; color: white; white-space: nowrap; }
-        .btn-fetch { background: var(--action-color); color: white; font-size: 1.1em; width: 100%; padding: 15px; letter-spacing: 1px; }
-        .btn-fetch:hover { background: #c0392b; }
+        .btn-remove:hover { background: #7f8c8d; }
+        .btn-fetch { background: var(--action-color); color: white; font-size: 1.1em; width: 100%; padding: 16px; letter-spacing: 1px; box-shadow: 0 4px 6px rgba(231, 76, 60, 0.3); }
+        .btn-fetch:hover { background: #c0392b; transform: translateY(-1px); }
         
-        /* Transposed Data Table Styles */
-        table { border-collapse: collapse; min-width: 100%; }
-        th, td { padding: 15px; border: 1px solid var(--border-color); vertical-align: top; }
+        /* Matrix Table Styles */
+        table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 800px; }
+        th { padding: 18px 15px; font-size: 1.2em; font-weight: bold; text-align: center; color: white; position: sticky; top: 0; z-index: 10; letter-spacing: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        td { padding: 15px; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); vertical-align: top; width: 250px; background-color: #fff; transition: background-color 0.2s; }
+        td:last-child { border-right: none; }
+        td:hover { background-color: #f4f6f7; }
         
-        /* 第一欄 (屬性名稱) 固定在左側 */
-        th.row-header {
-            background-color: var(--row-header-bg);
-            color: white;
-            position: sticky;
-            left: 0;
-            z-index: 10;
-            width: 100px;
-            text-align: center;
-            border-right: 2px solid #2c3e50;
-        }
+        .empty-cell { background-color: #fafbfc; }
+        .empty-cell:hover { background-color: #fafbfc; }
         
-        td.data-cell { min-width: 250px; background-color: #fff; }
-        td.data-cell:hover { background-color: #fdfefe; }
+        /* Product Card Inside Cell */
+        .prod-container { display: flex; flex-direction: column; height: 100%; justify-content: space-between; gap: 10px; }
+        .prod-name { font-weight: 600; font-size: 1.05em; color: var(--primary-color); line-height: 1.4; }
+        .prod-price-box { display: flex; flex-direction: column; align-items: flex-end; background: #f8f9f9; padding: 10px; border-radius: 6px; border-left: 4px solid #3498db; }
+        .curr-price { font-weight: 800; color: #d35400; font-family: monospace; font-size: 1.4em; }
+        .orig-price { text-decoration: line-through; color: #95a5a6; font-size: 0.9em; margin-top: 4px; }
         
-        /* Specific row styling */
-        tr.brand-row td { font-weight: bold; text-align: center; font-size: 1.2em; color: white; }
-        tr.name-row td { font-weight: 600; color: var(--primary-color); font-size: 1.1em; line-height: 1.4; }
-        tr.current-price-row td { font-weight: bold; color: #d35400; font-family: monospace; font-size: 1.3em; text-align: center; }
-        tr.original-price-row td { text-decoration: line-through; color: #7f8c8d; text-align: center; }
-        tr.discount-row td { color: #27ae60; font-weight: bold; text-align: center; }
+        #loading { display: none; text-align: center; font-weight: bold; color: white; background: var(--action-color); padding: 15px; margin-bottom: 15px; border-radius: 6px; animation: pulse 1.5s infinite; }
+        #error-log { color: #c0392b; font-family: monospace; white-space: pre-wrap; margin-top: 15px; font-size: 0.85em; background: #fdedec; padding: 10px; border-radius: 4px; display: none; }
         
-        .specs-list { margin: 0; padding-left: 20px; font-size: 0.9em; color: #444; line-height: 1.6; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
         
-        #loading { display: none; text-align: center; font-weight: bold; color: white; background: var(--action-color); padding: 15px; margin-bottom: 15px; border-radius: 4px; animation: pulse 1.5s infinite; }
-        #error-log { color: #c0392b; font-family: monospace; white-space: pre-wrap; margin-top: 10px; font-size: 0.85em; }
-        
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
-        
-        /* RWD */
         @media (max-width: 1024px) {
             .app-wrapper { flex-direction: column-reverse; }
             .control-panel { position: static; width: 100%; max-width: none; }
@@ -98,41 +66,42 @@
 <div class="app-wrapper">
     <div class="table-section">
         <table id="dataTable">
+            <thead id="tableHead">
+                </thead>
             <tbody id="tableBody">
-                <tr><td style="padding: 40px; text-align: center; color: #7f8c8d;">請於右側輸入網址並點擊抓取，資料將於此處生成。</td></tr>
+                <tr><td style="padding: 60px; text-align: center; color: #7f8c8d; font-size: 1.1em; border:none;">等待匯入競品網址，建立定價矩陣...</td></tr>
             </tbody>
         </table>
     </div>
 
     <div class="control-panel">
-        <div id="loading">⟳ Google 網路檢索解析中...</div>
+        <div id="loading">⟳ 啟動 Google 聯網檢索與格式化...</div>
         
         <div class="form-group">
-            <label for="apiKey">Google API Key (本機記憶):</label>
+            <label for="apiKey">Google API Key (自動記憶):</label>
             <input type="password" id="apiKey" placeholder="輸入 API 金鑰" onchange="saveState()">
         </div>
         <div class="form-group">
             <label for="aiModel">AI 檢索模型:</label>
             <select id="aiModel" onchange="saveState()">
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash (快速穩定)</option>
-                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (快速檢索)</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro (精準推理)</option>
                 <option value="gemini-3.0-flash">Gemini 3.0 Flash</option>
             </select>
         </div>
 
         <label>競品網址列表 (URLs):</label>
         <div id="urlContainer" class="url-list"></div>
-        <button class="btn-add" onclick="addUrl('')">+ 新增網址欄位</button>
+        <button class="btn-add" onclick="addUrl('')">+ 新增網址</button>
 
-        <button class="btn-fetch" onclick="fetchAndAnalyze()">開始橫向規格分析</button>
+        <button class="btn-fetch" onclick="fetchAndAnalyze()">執行階層定價分析</button>
         <div id="error-log"></div>
     </div>
 </div>
 
 <script>
-    // 預設廠牌識別色 (動態配給)
     const brandColorMap = {};
-    const colorPalette = ['#3498db', '#e67e22', '#9b59b6', '#1abc9c', '#f1c40f', '#e74c3c', '#34495e'];
+    const colorPalette = ['#2980b9', '#d35400', '#8e44ad', '#16a085', '#f39c12', '#2c3e50'];
     let colorIndex = 0;
 
     function getBrandColor(brand) {
@@ -185,51 +154,57 @@
         const apiKey = document.getElementById('apiKey').value;
         const model = document.getElementById('aiModel').value;
         const urlInputs = document.querySelectorAll('.product-url');
+        const tableHead = document.getElementById('tableHead');
         const tableBody = document.getElementById('tableBody');
         const loading = document.getElementById('loading');
         const errorLog = document.getElementById('error-log');
         
-        if (!apiKey) { alert('拒絕存取：請提供 API Key。'); return; }
+        if (!apiKey) { alert('系統拒絕：請輸入有效 API Key。'); return; }
 
         let urls = Array.from(urlInputs).map(input => input.value.trim()).filter(url => url !== '');
-        if (urls.length === 0) { alert('請至少輸入一個產品網址。'); return; }
+        if (urls.length === 0) { alert('參數缺失：未提供目標網址。'); return; }
 
         saveState();
         errorLog.innerText = '';
+        errorLog.style.display = 'none';
         loading.style.display = 'block';
-        tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center;">資料解析中，請稍候...</td></tr>';
+        tableHead.innerHTML = '';
+        tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; border:none;">核心算力啟動中，正與 Google 索引同步...</td></tr>';
         
         let productsData = [];
+        let hasError = false;
 
         for (const url of urls) {
             try {
                 const aiResult = await callGeminiAPIWithSearch(apiKey, model, url);
                 if (aiResult) productsData.push(aiResult);
             } catch (error) {
-                errorLog.innerText += `[失敗] ${url}\n原因: ${error.message}\n\n`;
+                hasError = true;
+                errorLog.style.display = 'block';
+                errorLog.innerText += `[截取失敗] ${url}\n-> ${error.message}\n\n`;
             }
         }
 
         loading.style.display = 'none';
         if (productsData.length > 0) {
-            renderTransposedTable(productsData);
+            renderPricingMatrix(productsData);
         } else {
-            tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; color: red;">所有抓取皆失敗，請檢查 API Key 或錯誤日誌。</td></tr>';
+            tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; color: #e74c3c; border:none;">建構失敗：無法獲取任何有效資料。請檢查錯誤日誌。</td></tr>';
         }
     }
 
     async function callGeminiAPIWithSearch(apiKey, model, targetUrl) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        
+        // Prompt 已精簡：剝除規格與折扣要求，專注於定價資料
         const prompt = `
-        任務：產品規格萃取。使用 Google Search 檢索以下網址：${targetUrl}
-        嚴格輸出純 JSON 物件，找不到請填 null。
+        任務：產品定價資料萃取。請使用 Google Search 檢索以下網址：${targetUrl}
+        嚴格輸出純 JSON 物件，找不到請填 null。不要有 Markdown。
         {
-          "brand": "廠牌名稱",
-          "name": "完整產品型號",
-          "specs": ["規格1", "規格2", "規格3"],
-          "originalPrice": 原始價格數字,
-          "currentPrice": 當前價格數字,
-          "discount": "折扣文字"
+          "brand": "廠牌名稱 (全大寫英文字母)",
+          "name": "產品完整型號名稱",
+          "originalPrice": 原始價格數字 (整數),
+          "currentPrice": 當前價格數字 (整數)
         }
         `;
 
@@ -245,7 +220,7 @@
         
         if (!response.ok) {
             const errData = await response.json();
-            throw new Error(`HTTP ${response.status} - ${errData.error?.message || '未知錯誤'}`);
+            throw new Error(`HTTP ${response.status} - ${errData.error?.message || '伺服器拒絕存取'}`);
         }
 
         const data = await response.json();
@@ -253,52 +228,71 @@
         
         const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
         if (jsonMatch) return JSON.parse(jsonMatch[0]);
-        throw new Error("模型未回傳標準 JSON 格式");
+        throw new Error("格式異常：模型未能輸出 JSON 結構");
     }
 
-    function renderTransposedTable(products) {
+    function renderPricingMatrix(products) {
+        const tableHead = document.getElementById('tableHead');
         const tableBody = document.getElementById('tableBody');
         
-        // 依照廠牌排序，確保同廠牌產品排在相鄰的欄位
-        products.sort((a, b) => {
-            const brandA = (a.brand || 'ZZZ').toUpperCase();
-            const brandB = (b.brand || 'ZZZ').toUpperCase();
-            if (brandA !== brandB) return brandA.localeCompare(brandB);
-            return (b.currentPrice || 0) - (a.currentPrice || 0);
-        });
-
-        // 建立轉置矩陣的各列 HTML
-        let brandHtml = '<tr class="brand-row"><th class="row-header">廠牌</th>';
-        let nameHtml = '<tr class="name-row"><th class="row-header">型號名稱</th>';
-        let curPriceHtml = '<tr class="current-price-row"><th class="row-header">當前價格</th>';
-        let origPriceHtml = '<tr class="original-price-row"><th class="row-header">原始價格</th>';
-        let discountHtml = '<tr class="discount-row"><th class="row-header">折扣幅度</th>';
-        let specsHtml = '<tr class="specs-row"><th class="row-header">核心規格</th>';
-
+        // 步驟 1: 依據廠牌進行資料分組
+        const brandGroups = {};
         products.forEach(p => {
-            const brandName = p.brand || '未知';
-            const bColor = getBrandColor(brandName);
-            
-            // 廠牌列套用動態背景色
-            brandHtml += `<td class="data-cell" style="background-color: ${bColor};">${brandName}</td>`;
-            nameHtml += `<td class="data-cell">${p.name || '-'}</td>`;
-            curPriceHtml += `<td class="data-cell">${p.currentPrice ? '$' + p.currentPrice : '-'}</td>`;
-            origPriceHtml += `<td class="data-cell">${p.originalPrice ? '$' + p.originalPrice : '-'}</td>`;
-            discountHtml += `<td class="data-cell">${p.discount || '-'}</td>`;
-            
-            const specsList = (p.specs || []).map(s => `<li>${s}</li>`).join('');
-            specsHtml += `<td class="data-cell"><ul class="specs-list">${specsList || '-'}</ul></td>`;
+            const b = (p.brand || 'UNKNOWN').toUpperCase();
+            if (!brandGroups[b]) brandGroups[b] = [];
+            brandGroups[b].push(p);
         });
 
-        brandHtml += '</tr>';
-        nameHtml += '</tr>';
-        curPriceHtml += '</tr>';
-        origPriceHtml += '</tr>';
-        discountHtml += '</tr>';
-        specsHtml += '</tr>';
+        const sortedBrands = Object.keys(brandGroups).sort();
+        let maxRowDepth = 0;
 
-        // 組合輸出
-        tableBody.innerHTML = brandHtml + nameHtml + curPriceHtml + origPriceHtml + discountHtml + specsHtml;
+        // 步驟 2: 對每個廠牌內部的產品依據價格由高至低排序，並找出最大深度
+        sortedBrands.forEach(b => {
+            brandGroups[b].sort((x, y) => (y.currentPrice || 0) - (x.currentPrice || 0));
+            if (brandGroups[b].length > maxRowDepth) {
+                maxRowDepth = brandGroups[b].length;
+            }
+        });
+
+        // 步驟 3: 渲染表頭 (廠牌名稱)
+        let theadHtml = '<tr>';
+        sortedBrands.forEach(b => {
+            theadHtml += `<th style="background-color: ${getBrandColor(b)};">${b}</th>`;
+        });
+        theadHtml += '</tr>';
+        tableHead.innerHTML = headHtml;
+
+        // 步驟 4: 逐列渲染資料 (Row by Row)
+        let tbodyHtml = '';
+        for (let i = 0; i < maxRowDepth; i++) {
+            tbodyHtml += '<tr>';
+            
+            sortedBrands.forEach(b => {
+                const product = brandGroups[b][i];
+                if (product) {
+                    const origPriceHtml = product.originalPrice ? `<div class="orig-price">$${product.originalPrice}</div>` : '';
+                    const currPriceHtml = product.currentPrice ? `$${product.currentPrice}` : 'N/A';
+                    
+                    tbodyHtml += `
+                        <td>
+                            <div class="prod-container">
+                                <div class="prod-name">${product.name || '未知產品'}</div>
+                                <div class="prod-price-box">
+                                    <div class="curr-price">${currPriceHtml}</div>
+                                    ${origPriceHtml}
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                } else {
+                    // 若該廠牌在此深度無產品，填入空白儲存格
+                    tbodyHtml += '<td class="empty-cell"></td>';
+                }
+            });
+            
+            tbodyHtml += '</tr>';
+        }
+        tableBody.innerHTML = tbodyHtml;
     }
 </script>
 
