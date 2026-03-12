@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>競品定價分析矩陣 V8 (極速代理版)</title>
+    <title>競品定價分析矩陣 V9 (穩定溯源版)</title>
     <style>
         :root { --bg-color: #f0f3f4; --text-color: #2c3e50; --border-color: #d5d8dc; --primary-color: #34495e; --action-color: #e74c3c; --card-bg: #ffffff; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
@@ -60,13 +60,13 @@
         <table id="dataTable">
             <thead id="tableHead"></thead>
             <tbody id="tableBody">
-                <tr><td style="padding: 60px; text-align: center; color: #7f8c8d; font-size: 1.1em; border:none;">等待匯入競品主機板/零組件網址，建立定價矩陣...</td></tr>
+                <tr><td style="padding: 60px; text-align: center; color: #7f8c8d; font-size: 1.1em; border:none;">等待匯入競品網址，建立定價矩陣...</td></tr>
             </tbody>
         </table>
     </div>
 
     <div class="control-panel">
-        <div id="loading">⟳ 執行高速資料管線 (Jina API + Gemini)...</div>
+        <div id="loading">⟳ 委託 Google 搜尋引擎檢索網頁與價格中... (這需要一點時間)</div>
         
         <div class="form-group">
             <label for="apiKey">Google API Key (自動記憶):</label>
@@ -216,73 +216,62 @@
         errorLog.style.display = 'none';
         loading.style.display = 'block';
         tableHead.innerHTML = '';
-        tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; border:none;">平行處理啟動，正透過 Jina 節點提取資料...</td></tr>';
+        tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; border:none;">核心算力啟動中，正與 Google 索引同步...</td></tr>';
         
-        // 採用 Promise.all 進行平行非同步抓取，極致化處理速度
-        const fetchPromises = urls.map(url => callJinaAndGemini(apiKey, model, url)
-            .catch(error => {
-                errorLog.style.display = 'block';
-                errorLog.innerText += `[失敗] ${url}\n-> ${error.message}\n\n`;
-                return null;
-            })
-        );
+        let productsData = [];
 
-        const results = await Promise.all(fetchPromises);
-        const productsData = results.filter(res => res !== null);
+        // 採用循序讀取以避免觸發免費 API Key 的 Rate Limit (每分鐘請求數限制)
+        for (const url of urls) {
+            try {
+                const aiResult = await callGeminiAPIWithSearch(apiKey, model, url);
+                if (aiResult) productsData.push(aiResult);
+            } catch (error) {
+                errorLog.style.display = 'block';
+                errorLog.innerText += `[截取失敗] ${url}\n-> ${error.message}\n\n`;
+            }
+        }
 
         loading.style.display = 'none';
         if (productsData.length > 0) {
             renderPricingMatrix(productsData);
         } else {
-            tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; color: #e74c3c; border:none;">建構失敗：無法獲取有效資料。可能是防爬蟲升級或 API 異常。</td></tr>';
+            tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; color: #e74c3c; border:none;">建構失敗：無法獲取任何有效資料。請檢查錯誤日誌。</td></tr>';
         }
     }
 
-    async function callJinaAndGemini(apiKey, model, targetUrl) {
-        // 階段 1：使用 Jina API 將網頁轉為乾淨的 Markdown
-        const jinaUrl = `https://r.jina.ai/${targetUrl}`;
-        const proxyResponse = await fetch(jinaUrl);
-        
-        if (!proxyResponse.ok) throw new Error(`Jina 代理伺服器拒絕存取 (HTTP ${proxyResponse.status})`);
-        
-        const markdownText = await proxyResponse.text();
-        if (markdownText.includes("Just a moment") || markdownText.includes("Cloudflare")) {
-            throw new Error("高強度 WAF 攔截：目標網站的防爬蟲機制擋下了 Jina 節點");
-        }
-
-        // 截取前 8000 字元，避免 Token 超載，價格通常在 Markdown 前半部
-        const payloadText = markdownText.substring(0, 8000);
-
-        // 階段 2：交由 Gemini 進行高速純文字解析 (不依賴 Search Tool)
+    // 核心還原：使用 Google Search Tools 進行資料落地 (Search Grounding)
+    async function callGeminiAPIWithSearch(apiKey, model, targetUrl) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const prompt = `
-        任務：產品定價資料萃取。請分析以下網頁 Markdown 文本，並嚴格輸出純 JSON 物件。找不到請填 null。不要有 Markdown 標記。
+        任務：產品定價資料萃取。請使用你的 Google Search Tool 檢索以下網址的最新產品定價：
+        網址：${targetUrl}
+        
+        嚴格輸出純 JSON 物件，找不到請填 null。不要有 Markdown。
         {
           "brand": "廠牌名稱 (全大寫英文字母，如 ASUS, MSI, GIGABYTE 等)",
           "name": "產品完整型號名稱",
           "originalPrice": 原始價格數字 (整數),
           "currentPrice": 當前價格數字 (整數)
         }
-        
-        網頁文本來源：
-        ${payloadText}
         `;
 
-        const aiResponse = await fetch(endpoint, {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.1 } // 極低溫度確保 JSON 結構穩定
+                // 重啟 Google 搜尋溯源工具以突破 WAF 封鎖
+                tools: [{ googleSearch: {} }],
+                generationConfig: { temperature: 0.1 }
             })
         });
         
-        if (!aiResponse.ok) {
-            const errData = await aiResponse.json();
-            throw new Error(`Gemini 推論失敗 (HTTP ${aiResponse.status})`);
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(`HTTP ${response.status} - ${errData.error?.message || '伺服器拒絕存取'}`);
         }
 
-        const data = await aiResponse.json();
+        const data = await response.json();
         const textResponse = data.candidates[0].content.parts[0].text;
         
         const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
