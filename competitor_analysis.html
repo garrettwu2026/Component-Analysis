@@ -3,17 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>競品定價分析矩陣 V7 (動態感知版)</title>
+    <title>競品定價分析矩陣 V8 (極速代理版)</title>
     <style>
         :root { --bg-color: #f0f3f4; --text-color: #2c3e50; --border-color: #d5d8dc; --primary-color: #34495e; --action-color: #e74c3c; --card-bg: #ffffff; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
         
         .app-wrapper { display: flex; gap: 20px; max-width: 1800px; margin: 0 auto; align-items: flex-start; }
-        
-        /* Left: Matrix Section */
         .table-section { flex: 3; background: var(--card-bg); border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow-x: auto; min-height: 600px; padding: 1px; }
-        
-        /* Right: Control Panel */
         .control-panel { flex: 1; min-width: 320px; max-width: 400px; background: var(--card-bg); padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: sticky; top: 20px; }
 
         .form-group { margin-bottom: 15px; }
@@ -35,7 +31,6 @@
         .btn-fetch:hover { background: #c0392b; transform: translateY(-1px); }
         .btn-fetch:disabled { background: #bdc3c7; cursor: not-allowed; box-shadow: none; transform: none; }
         
-        /* Matrix Table Styles */
         table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 800px; }
         th { padding: 18px 15px; font-size: 1.2em; font-weight: bold; text-align: center; color: white; position: sticky; top: 0; z-index: 10; letter-spacing: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         td { padding: 15px; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); vertical-align: top; width: 250px; background-color: #fff; transition: background-color 0.2s; }
@@ -43,9 +38,7 @@
         td:hover { background-color: #f4f6f7; }
         
         .empty-cell { background-color: #fafbfc; }
-        .empty-cell:hover { background-color: #fafbfc; }
         
-        /* Product Card */
         .prod-container { display: flex; flex-direction: column; height: 100%; justify-content: space-between; gap: 10px; }
         .prod-name { font-weight: 600; font-size: 1.05em; color: var(--primary-color); line-height: 1.4; }
         .prod-price-box { display: flex; flex-direction: column; align-items: flex-end; background: #f8f9f9; padding: 10px; border-radius: 6px; border-left: 4px solid #3498db; }
@@ -53,15 +46,11 @@
         .orig-price { text-decoration: line-through; color: #95a5a6; font-size: 0.9em; margin-top: 4px; }
         
         #loading { display: none; text-align: center; font-weight: bold; color: white; background: var(--action-color); padding: 15px; margin-bottom: 15px; border-radius: 6px; animation: pulse 1.5s infinite; }
-        #error-log { color: #c0392b; font-family: monospace; white-space: pre-wrap; margin-top: 15px; font-size: 0.85em; background: #fdedec; padding: 10px; border-radius: 4px; display: none; }
+        #error-log { color: #c0392b; font-family: monospace; white-space: pre-wrap; margin-top: 15px; font-size: 0.85em; background: #fdedec; padding: 10px; border-radius: 4px; display: none; max-height: 150px; overflow-y: auto;}
         #api-status { font-size: 0.8em; margin-top: 5px; color: #27ae60; font-weight: bold; text-align: right; }
         
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
-        
-        @media (max-width: 1024px) {
-            .app-wrapper { flex-direction: column-reverse; }
-            .control-panel { position: static; width: 100%; max-width: none; }
-        }
+        @media (max-width: 1024px) { .app-wrapper { flex-direction: column-reverse; } .control-panel { position: static; width: 100%; max-width: none; } }
     </style>
 </head>
 <body>
@@ -71,13 +60,13 @@
         <table id="dataTable">
             <thead id="tableHead"></thead>
             <tbody id="tableBody">
-                <tr><td style="padding: 60px; text-align: center; color: #7f8c8d; font-size: 1.1em; border:none;">等待匯入競品網址，建立定價矩陣...</td></tr>
+                <tr><td style="padding: 60px; text-align: center; color: #7f8c8d; font-size: 1.1em; border:none;">等待匯入競品主機板/零組件網址，建立定價矩陣...</td></tr>
             </tbody>
         </table>
     </div>
 
     <div class="control-panel">
-        <div id="loading">⟳ 啟動 Google 聯網檢索與格式化...</div>
+        <div id="loading">⟳ 執行高速資料管線 (Jina API + Gemini)...</div>
         
         <div class="form-group">
             <label for="apiKey">Google API Key (自動記憶):</label>
@@ -85,7 +74,7 @@
             <div id="api-status">未驗證</div>
         </div>
         <div class="form-group">
-            <label for="aiModel">授權 AI 模型 (自動抓取):</label>
+            <label for="aiModel">授權 AI 模型 (動態載入):</label>
             <select id="aiModel" onchange="saveState()" disabled>
                 <option value="">請先輸入 API Key</option>
             </select>
@@ -120,7 +109,7 @@
 
         if (savedKey) {
             document.getElementById('apiKey').value = savedKey;
-            handleApiKeyChange(); // 載入時自動驗證 Key 並抓取模型
+            handleApiKeyChange(); 
         }
 
         if (savedUrls.length > 0) {
@@ -138,7 +127,6 @@
         localStorage.setItem('ca_urls', JSON.stringify(urls));
     }
 
-    // 動態獲取可用模型
     async function handleApiKeyChange() {
         saveState();
         const apiKey = document.getElementById('apiKey').value;
@@ -146,19 +134,11 @@
         const statusText = document.getElementById('api-status');
         const fetchBtn = document.getElementById('fetchBtn');
 
-        if (!apiKey) {
-            modelSelect.innerHTML = '<option value="">請先輸入 API Key</option>';
-            modelSelect.disabled = true;
-            fetchBtn.disabled = true;
-            fetchBtn.innerText = '等待模型載入...';
-            statusText.innerText = '未驗證';
-            statusText.style.color = '#7f8c8d';
-            return;
-        }
+        if (!apiKey) return;
 
         statusText.innerText = '驗證中...';
         statusText.style.color = '#f39c12';
-        modelSelect.innerHTML = '<option>向 Google 伺服器同步權限中...</option>';
+        modelSelect.innerHTML = '<option>向 Google 同步權限中...</option>';
         modelSelect.disabled = true;
         fetchBtn.disabled = true;
 
@@ -167,8 +147,6 @@
             if (!res.ok) throw new Error('API Key 無效或遭拒絕');
             
             const data = await res.json();
-            
-            // 過濾出支援 generateContent 且為 gemini 系列的文字/多模態模型
             const validModels = data.models.filter(m => 
                 m.supportedGenerationMethods.includes('generateContent') && 
                 m.name.includes('gemini') && 
@@ -187,7 +165,6 @@
                 modelSelect.appendChild(option);
             });
 
-            // 嘗試恢復先前的模型選擇
             const savedModel = localStorage.getItem('ca_model');
             if (savedModel && Array.from(modelSelect.options).some(opt => opt.value === savedModel)) {
                 modelSelect.value = savedModel;
@@ -203,7 +180,6 @@
             modelSelect.innerHTML = '<option value="">獲取失敗，請確認 API Key</option>';
             statusText.innerText = '✖ 驗證失敗';
             statusText.style.color = '#e74c3c';
-            console.error(err);
         }
     }
 
@@ -211,7 +187,7 @@
         const container = document.getElementById('urlContainer');
         const div = document.createElement('div');
         div.className = 'url-item';
-        div.innerHTML = `<input type="text" class="product-url" value="${value}" placeholder="https://..." onchange="saveState()"><button class="btn-remove" onclick="removeUrl(this)">刪除</button>`;
+        div.innerHTML = `<input type="text" class="product-url" value="${value}" placeholder="https://www.newegg.com/..." onchange="saveState()"><button class="btn-remove" onclick="removeUrl(this)">刪除</button>`;
         container.appendChild(div);
         saveState();
     }
@@ -240,57 +216,73 @@
         errorLog.style.display = 'none';
         loading.style.display = 'block';
         tableHead.innerHTML = '';
-        tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; border:none;">核心算力啟動中，正與 Google 索引同步...</td></tr>';
+        tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; border:none;">平行處理啟動，正透過 Jina 節點提取資料...</td></tr>';
         
-        let productsData = [];
-
-        for (const url of urls) {
-            try {
-                const aiResult = await callGeminiAPIWithSearch(apiKey, model, url);
-                if (aiResult) productsData.push(aiResult);
-            } catch (error) {
+        // 採用 Promise.all 進行平行非同步抓取，極致化處理速度
+        const fetchPromises = urls.map(url => callJinaAndGemini(apiKey, model, url)
+            .catch(error => {
                 errorLog.style.display = 'block';
-                errorLog.innerText += `[截取失敗] ${url}\n-> ${error.message}\n\n`;
-            }
-        }
+                errorLog.innerText += `[失敗] ${url}\n-> ${error.message}\n\n`;
+                return null;
+            })
+        );
+
+        const results = await Promise.all(fetchPromises);
+        const productsData = results.filter(res => res !== null);
 
         loading.style.display = 'none';
         if (productsData.length > 0) {
             renderPricingMatrix(productsData);
         } else {
-            tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; color: #e74c3c; border:none;">建構失敗：無法獲取任何有效資料。請檢查錯誤日誌。</td></tr>';
+            tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; color: #e74c3c; border:none;">建構失敗：無法獲取有效資料。可能是防爬蟲升級或 API 異常。</td></tr>';
         }
     }
 
-    async function callGeminiAPIWithSearch(apiKey, model, targetUrl) {
+    async function callJinaAndGemini(apiKey, model, targetUrl) {
+        // 階段 1：使用 Jina API 將網頁轉為乾淨的 Markdown
+        const jinaUrl = `https://r.jina.ai/${targetUrl}`;
+        const proxyResponse = await fetch(jinaUrl);
+        
+        if (!proxyResponse.ok) throw new Error(`Jina 代理伺服器拒絕存取 (HTTP ${proxyResponse.status})`);
+        
+        const markdownText = await proxyResponse.text();
+        if (markdownText.includes("Just a moment") || markdownText.includes("Cloudflare")) {
+            throw new Error("高強度 WAF 攔截：目標網站的防爬蟲機制擋下了 Jina 節點");
+        }
+
+        // 截取前 8000 字元，避免 Token 超載，價格通常在 Markdown 前半部
+        const payloadText = markdownText.substring(0, 8000);
+
+        // 階段 2：交由 Gemini 進行高速純文字解析 (不依賴 Search Tool)
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const prompt = `
-        任務：產品定價資料萃取。請使用 Google Search 檢索以下網址：${targetUrl}
-        嚴格輸出純 JSON 物件，找不到請填 null。不要有 Markdown。
+        任務：產品定價資料萃取。請分析以下網頁 Markdown 文本，並嚴格輸出純 JSON 物件。找不到請填 null。不要有 Markdown 標記。
         {
-          "brand": "廠牌名稱 (全大寫英文字母)",
+          "brand": "廠牌名稱 (全大寫英文字母，如 ASUS, MSI, GIGABYTE 等)",
           "name": "產品完整型號名稱",
           "originalPrice": 原始價格數字 (整數),
           "currentPrice": 當前價格數字 (整數)
         }
+        
+        網頁文本來源：
+        ${payloadText}
         `;
 
-        const response = await fetch(endpoint, {
+        const aiResponse = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                tools: [{ googleSearch: {} }],
-                generationConfig: { temperature: 0.1 }
+                generationConfig: { temperature: 0.1 } // 極低溫度確保 JSON 結構穩定
             })
         });
         
-        if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(`HTTP ${response.status} - ${errData.error?.message || '伺服器拒絕存取'}`);
+        if (!aiResponse.ok) {
+            const errData = await aiResponse.json();
+            throw new Error(`Gemini 推論失敗 (HTTP ${aiResponse.status})`);
         }
 
-        const data = await response.json();
+        const data = await aiResponse.json();
         const textResponse = data.candidates[0].content.parts[0].text;
         
         const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
