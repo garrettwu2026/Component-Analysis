@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>競品定價分析矩陣 V6</title>
+    <title>競品定價分析矩陣 V7 (動態感知版)</title>
     <style>
         :root { --bg-color: #f0f3f4; --text-color: #2c3e50; --border-color: #d5d8dc; --primary-color: #34495e; --action-color: #e74c3c; --card-bg: #ffffff; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
@@ -20,6 +20,7 @@
         label { font-weight: 600; display: block; margin-bottom: 8px; color: var(--primary-color); font-size: 0.9em; letter-spacing: 0.5px; }
         input[type="text"], input[type="password"], select { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; font-family: monospace; font-size: 14px; background-color: #fdfefe; }
         input:focus, select:focus { outline: none; border-color: #3498db; }
+        select:disabled { background-color: #eaeded; cursor: not-allowed; color: #7f8c8d; }
         
         .url-list { margin-bottom: 15px; max-height: 350px; overflow-y: auto; padding-right: 5px; }
         .url-item { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -32,6 +33,7 @@
         .btn-remove:hover { background: #7f8c8d; }
         .btn-fetch { background: var(--action-color); color: white; font-size: 1.1em; width: 100%; padding: 16px; letter-spacing: 1px; box-shadow: 0 4px 6px rgba(231, 76, 60, 0.3); }
         .btn-fetch:hover { background: #c0392b; transform: translateY(-1px); }
+        .btn-fetch:disabled { background: #bdc3c7; cursor: not-allowed; box-shadow: none; transform: none; }
         
         /* Matrix Table Styles */
         table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 800px; }
@@ -43,7 +45,7 @@
         .empty-cell { background-color: #fafbfc; }
         .empty-cell:hover { background-color: #fafbfc; }
         
-        /* Product Card Inside Cell */
+        /* Product Card */
         .prod-container { display: flex; flex-direction: column; height: 100%; justify-content: space-between; gap: 10px; }
         .prod-name { font-weight: 600; font-size: 1.05em; color: var(--primary-color); line-height: 1.4; }
         .prod-price-box { display: flex; flex-direction: column; align-items: flex-end; background: #f8f9f9; padding: 10px; border-radius: 6px; border-left: 4px solid #3498db; }
@@ -52,6 +54,7 @@
         
         #loading { display: none; text-align: center; font-weight: bold; color: white; background: var(--action-color); padding: 15px; margin-bottom: 15px; border-radius: 6px; animation: pulse 1.5s infinite; }
         #error-log { color: #c0392b; font-family: monospace; white-space: pre-wrap; margin-top: 15px; font-size: 0.85em; background: #fdedec; padding: 10px; border-radius: 4px; display: none; }
+        #api-status { font-size: 0.8em; margin-top: 5px; color: #27ae60; font-weight: bold; text-align: right; }
         
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
         
@@ -66,8 +69,7 @@
 <div class="app-wrapper">
     <div class="table-section">
         <table id="dataTable">
-            <thead id="tableHead">
-                </thead>
+            <thead id="tableHead"></thead>
             <tbody id="tableBody">
                 <tr><td style="padding: 60px; text-align: center; color: #7f8c8d; font-size: 1.1em; border:none;">等待匯入競品網址，建立定價矩陣...</td></tr>
             </tbody>
@@ -79,14 +81,13 @@
         
         <div class="form-group">
             <label for="apiKey">Google API Key (自動記憶):</label>
-            <input type="password" id="apiKey" placeholder="輸入 API 金鑰" onchange="saveState()">
+            <input type="password" id="apiKey" placeholder="輸入 API 金鑰" onchange="handleApiKeyChange()">
+            <div id="api-status">未驗證</div>
         </div>
         <div class="form-group">
-            <label for="aiModel">AI 檢索模型:</label>
-            <select id="aiModel" onchange="saveState()">
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash (快速檢索)</option>
-                <option value="gemini-2.5-pro">Gemini 2.5 Pro (精準推理)</option>
-                <option value="gemini-3.0-flash">Gemini 3.0 Flash</option>
+            <label for="aiModel">授權 AI 模型 (自動抓取):</label>
+            <select id="aiModel" onchange="saveState()" disabled>
+                <option value="">請先輸入 API Key</option>
             </select>
         </div>
 
@@ -94,7 +95,7 @@
         <div id="urlContainer" class="url-list"></div>
         <button class="btn-add" onclick="addUrl('')">+ 新增網址</button>
 
-        <button class="btn-fetch" onclick="fetchAndAnalyze()">執行階層定價分析</button>
+        <button class="btn-fetch" id="fetchBtn" onclick="fetchAndAnalyze()" disabled>等待模型載入...</button>
         <div id="error-log"></div>
     </div>
 </div>
@@ -115,11 +116,12 @@
 
     window.onload = function() {
         const savedKey = localStorage.getItem('ca_apiKey');
-        const savedModel = localStorage.getItem('ca_model');
         const savedUrls = JSON.parse(localStorage.getItem('ca_urls') || '[]');
 
-        if (savedKey) document.getElementById('apiKey').value = savedKey;
-        if (savedModel) document.getElementById('aiModel').value = savedModel;
+        if (savedKey) {
+            document.getElementById('apiKey').value = savedKey;
+            handleApiKeyChange(); // 載入時自動驗證 Key 並抓取模型
+        }
 
         if (savedUrls.length > 0) {
             savedUrls.forEach(url => addUrl(url));
@@ -134,6 +136,75 @@
         const urlInputs = document.querySelectorAll('.product-url');
         const urls = Array.from(urlInputs).map(input => input.value.trim()).filter(url => url !== '');
         localStorage.setItem('ca_urls', JSON.stringify(urls));
+    }
+
+    // 動態獲取可用模型
+    async function handleApiKeyChange() {
+        saveState();
+        const apiKey = document.getElementById('apiKey').value;
+        const modelSelect = document.getElementById('aiModel');
+        const statusText = document.getElementById('api-status');
+        const fetchBtn = document.getElementById('fetchBtn');
+
+        if (!apiKey) {
+            modelSelect.innerHTML = '<option value="">請先輸入 API Key</option>';
+            modelSelect.disabled = true;
+            fetchBtn.disabled = true;
+            fetchBtn.innerText = '等待模型載入...';
+            statusText.innerText = '未驗證';
+            statusText.style.color = '#7f8c8d';
+            return;
+        }
+
+        statusText.innerText = '驗證中...';
+        statusText.style.color = '#f39c12';
+        modelSelect.innerHTML = '<option>向 Google 伺服器同步權限中...</option>';
+        modelSelect.disabled = true;
+        fetchBtn.disabled = true;
+
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+            if (!res.ok) throw new Error('API Key 無效或遭拒絕');
+            
+            const data = await res.json();
+            
+            // 過濾出支援 generateContent 且為 gemini 系列的文字/多模態模型
+            const validModels = data.models.filter(m => 
+                m.supportedGenerationMethods.includes('generateContent') && 
+                m.name.includes('gemini') && 
+                !m.name.includes('vision') && 
+                !m.name.includes('embedding')
+            );
+
+            if (validModels.length === 0) throw new Error('無可用生成模型');
+
+            modelSelect.innerHTML = '';
+            validModels.forEach(m => {
+                const shortName = m.name.replace('models/', '');
+                const option = document.createElement('option');
+                option.value = shortName;
+                option.textContent = `${m.displayName} (${shortName})`;
+                modelSelect.appendChild(option);
+            });
+
+            // 嘗試恢復先前的模型選擇
+            const savedModel = localStorage.getItem('ca_model');
+            if (savedModel && Array.from(modelSelect.options).some(opt => opt.value === savedModel)) {
+                modelSelect.value = savedModel;
+            }
+
+            modelSelect.disabled = false;
+            fetchBtn.disabled = false;
+            fetchBtn.innerText = '執行階層定價分析';
+            statusText.innerText = '✔ 授權成功';
+            statusText.style.color = '#27ae60';
+
+        } catch (err) {
+            modelSelect.innerHTML = '<option value="">獲取失敗，請確認 API Key</option>';
+            statusText.innerText = '✖ 驗證失敗';
+            statusText.style.color = '#e74c3c';
+            console.error(err);
+        }
     }
 
     function addUrl(value = '') {
@@ -159,7 +230,7 @@
         const loading = document.getElementById('loading');
         const errorLog = document.getElementById('error-log');
         
-        if (!apiKey) { alert('系統拒絕：請輸入有效 API Key。'); return; }
+        if (!apiKey || !model) { alert('系統尚未就緒：請確認 API Key 與模型選擇。'); return; }
 
         let urls = Array.from(urlInputs).map(input => input.value.trim()).filter(url => url !== '');
         if (urls.length === 0) { alert('參數缺失：未提供目標網址。'); return; }
@@ -172,14 +243,12 @@
         tableBody.innerHTML = '<tr><td style="padding: 40px; text-align: center; border:none;">核心算力啟動中，正與 Google 索引同步...</td></tr>';
         
         let productsData = [];
-        let hasError = false;
 
         for (const url of urls) {
             try {
                 const aiResult = await callGeminiAPIWithSearch(apiKey, model, url);
                 if (aiResult) productsData.push(aiResult);
             } catch (error) {
-                hasError = true;
                 errorLog.style.display = 'block';
                 errorLog.innerText += `[截取失敗] ${url}\n-> ${error.message}\n\n`;
             }
@@ -195,8 +264,6 @@
 
     async function callGeminiAPIWithSearch(apiKey, model, targetUrl) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        
-        // Prompt 已精簡：剝除規格與折扣要求，專注於定價資料
         const prompt = `
         任務：產品定價資料萃取。請使用 Google Search 檢索以下網址：${targetUrl}
         嚴格輸出純 JSON 物件，找不到請填 null。不要有 Markdown。
@@ -235,7 +302,6 @@
         const tableHead = document.getElementById('tableHead');
         const tableBody = document.getElementById('tableBody');
         
-        // 步驟 1: 依據廠牌進行資料分組
         const brandGroups = {};
         products.forEach(p => {
             const b = (p.brand || 'UNKNOWN').toUpperCase();
@@ -246,7 +312,6 @@
         const sortedBrands = Object.keys(brandGroups).sort();
         let maxRowDepth = 0;
 
-        // 步驟 2: 對每個廠牌內部的產品依據價格由高至低排序，並找出最大深度
         sortedBrands.forEach(b => {
             brandGroups[b].sort((x, y) => (y.currentPrice || 0) - (x.currentPrice || 0));
             if (brandGroups[b].length > maxRowDepth) {
@@ -254,19 +319,16 @@
             }
         });
 
-        // 步驟 3: 渲染表頭 (廠牌名稱)
         let theadHtml = '<tr>';
         sortedBrands.forEach(b => {
             theadHtml += `<th style="background-color: ${getBrandColor(b)};">${b}</th>`;
         });
         theadHtml += '</tr>';
-        tableHead.innerHTML = headHtml;
+        tableHead.innerHTML = theadHtml;
 
-        // 步驟 4: 逐列渲染資料 (Row by Row)
         let tbodyHtml = '';
         for (let i = 0; i < maxRowDepth; i++) {
             tbodyHtml += '<tr>';
-            
             sortedBrands.forEach(b => {
                 const product = brandGroups[b][i];
                 if (product) {
@@ -285,11 +347,9 @@
                         </td>
                     `;
                 } else {
-                    // 若該廠牌在此深度無產品，填入空白儲存格
                     tbodyHtml += '<td class="empty-cell"></td>';
                 }
             });
-            
             tbodyHtml += '</tr>';
         }
         tableBody.innerHTML = tbodyHtml;
